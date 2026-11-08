@@ -17,6 +17,9 @@
     <div class="d-flex gap-2">
         <a asp-action="Create" class="btn btn-dark">+ Ajouter une opération</a>
         <a asp-action="Import" class="btn btn-warning fw-semibold">Importer CSV</a>
+        <a asp-action="ExportCsv" asp-route-category="@ViewBag.SelectedCategory" asp-route-search="@ViewBag.Search" class="btn btn-outline-success">
+            Exporter CSV
+        </a>
     </div>
 </div>
 
@@ -29,8 +32,9 @@
             <option value="">-- Toutes les catégories --</option>
         </select>
     </div>
-    <div class="col-md-3 d-grid">
-        <button type="submit" class="btn btn-outline-primary">Filtrer</button>
+    <div class="col-md-3 d-flex gap-2">
+        <button type="submit" class="btn btn-outline-primary flex-grow-1">Filtrer</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">Réinitialiser</a>
     </div>
 </form>
 
@@ -44,7 +48,7 @@
                     <th>Catégorie</th>
                     <th>Source Cat.</th>
                     <th class="text-end">Montant (TND)</th>
-                    <th></th>
+                    <th class="text-end" style="min-width: 140px;">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -63,7 +67,8 @@
                             @(item.Type == Dinari.Models.TransactionType.Income ? "+" : "-")@item.AmountTnd.ToString("0.000") TND
                         </td>
                         <td class="text-end">
-                            <form asp-action="Delete" asp-route-id="@item.Id" method="post" class="d-inline">
+                            <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-secondary me-1">Modifier</a>
+                            <form asp-action="Delete" asp-route-id="@item.Id" method="post" class="d-inline" onsubmit="return confirm('Supprimer cette transaction ?');">
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="btn btn-sm btn-outline-danger">Supprimer</button>
                             </form>
@@ -74,4 +79,3 @@
         </table>
     </div>
 </div>
-
