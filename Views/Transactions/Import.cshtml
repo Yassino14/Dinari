@@ -1,0 +1,58 @@
+@model Dinari.Models.CsvImportResult
+@{
+    ViewData["Title"] = "Importation CSV";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h4 class="mb-0 fw-bold">Importer un Relevé de Transactions (CSV)</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">
+                    Colonnes reconnues automatiquement : <code>Date</code>, <code>Description</code> (ou <code>Libelle</code>),
+                    <code>Montant</code> (en TND, séparateur décimal point ou virgule), et optionnellement <code>Type</code> ou <code>Categorie</code>.
+                    Les séparateurs <code>;</code> et <code>,</code> sont détectés automatiquement.
+                </p>
+
+                <form asp-action="Import" method="post" enctype="multipart/form-data" class="mb-4">
+                    @Html.AntiForgeryToken()
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Fichier CSV (.csv)</label>
+                        <input type="file" name="csvFile" accept=".csv,text/csv" class="form-control" required />
+                    </div>
+                    <button type="submit" class="btn btn-primary px-4">Lancer l'importation et la catégorisation</button>
+                    <a asp-controller="Dashboard" asp-action="Index" class="btn btn-outline-secondary ms-2">Retour au Dashboard</a>
+                </form>
+
+                @if (Model != null)
+                {
+                    <div class="alert alert-info">
+                        <h6 class="fw-bold">Résultat de l'importation :</h6>
+                        <ul class="mb-0">
+                            <li>Lignes analysées : <strong>@Model.TotalRowsRead</strong></li>
+                            <li>Nouvelles transactions importées : <strong class="text-success">@Model.ImportedCount</strong></li>
+                            <li>Doublons ignorés (SHA-256) : <strong>@Model.SkippedDuplicatesCount</strong></li>
+                        </ul>
+                    </div>
+
+                    @if (Model.Errors.Count > 0)
+                    {
+                        <div class="alert alert-warning">
+                            <h6 class="fw-bold">Avertissements :</h6>
+                            <ul class="mb-0 small">
+                                @foreach (var err in Model.Errors)
+                                {
+                                    <li>@err</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+</div>
+

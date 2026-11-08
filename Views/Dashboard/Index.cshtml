@@ -1,0 +1,247 @@
+@model Dinari.Models.DashboardViewModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Tableau de Bord Financier";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-0">Analyse & Prévisions Financières (@Model.CurrentMonthLabel)</h2>
+        <p class="text-muted mb-0">@Model.ForecastMethodSummary</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-controller="Transactions" asp-action="Create" class="btn btn-outline-dark">+ Nouvelle opération</a>
+        <a asp-controller="Transactions" asp-action="Import" class="btn btn-primary">Importer un relevé CSV</a>
+    </div>
+</div>
+
+<!-- Cartes KPI en Dinars Tunisiens (TND) -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase fw-semibold">Revenus du mois</div>
+                <div class="fs-4 fw-bold text-success mt-1">@Model.CurrentMonthIncomeTnd.ToString("0.000") TND</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase fw-semibold">Dépenses du mois</div>
+                <div class="fs-4 fw-bold text-danger mt-1">@Model.CurrentMonthExpensesTnd.ToString("0.000") TND</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase fw-semibold">Solde Net & Taux d'épargne</div>
+                <div class="fs-4 fw-bold @(Model.NetBalanceTnd >= 0 ? "text-primary" : "text-danger") mt-1">
+                    @Model.NetBalanceTnd.ToString("0.000") TND
+                </div>
+                <small class="text-muted">Épargne : @Model.SavingsRatePercent%</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100 bg-dark text-white">
+            <div class="card-body">
+                <div class="text-warning small text-uppercase fw-semibold">Prévision Mois Suivant</div>
+                <div class="fs-4 fw-bold mt-1">@Model.ForecastNextMonthTotalTnd.ToString("0.000") TND</div>
+                <small class="@(Model.ForecastGrowthPercent > 0 ? "text-danger" : "text-success")">
+                    @(Model.ForecastGrowthPercent >= 0 ? "+" : "")@Model.ForecastGrowthPercent% vs mois actuel
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Détection des mauvaises habitudes financières -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+        <h5 class="mb-0 fw-bold">Détection des Habitudes Financières & Recommandations</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            @foreach (var habit in Model.BadHabits)
+            {
+                <div class="col-md-6">
+                    <div class="alert alert-@habit.Severity mb-0 h-100">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <h6 class="fw-bold mb-1">@habit.Title</h6>
+                            @if (habit.EstimatedMonthlyImpactTnd > 0)
+                            {
+                                <span class="badge bg-dark">Économie potentielle : @habit.EstimatedMonthlyImpactTnd.ToString("0.000") TND/mois</span>
+                            }
+                        </div>
+                        <p class="small mb-2">@habit.Description</p>
+                        <div class="small fw-semibold">Action conseillée : @habit.Recommendation</div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Graphiques Chart.js -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 fw-bold">Évolution Mensuelle & Prévision (TND)</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="trendChart" height="130"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 fw-bold">Répartition par Catégorie (@Model.CurrentMonthLabel)</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="categoryChart" height="180"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Dépenses inhabituelles (Z-Score) & Prévisions par catégorie -->
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-danger">Dépenses Inhabituelles Détectées (Z-Score)</h5>
+                <span class="badge bg-danger">@Model.UnusualExpenses.Count anomalie(s)</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Libellé</th>
+                            <th>Catégorie</th>
+                            <th class="text-end">Montant (TND)</th>
+                            <th class="text-end">Moyenne Cat.</th>
+                            <th class="text-center">Z-Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.UnusualExpenses.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">Aucune dépense statistiquement inhabituelle détectée.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var anomaly in Model.UnusualExpenses)
+                            {
+                                <tr>
+                                    <td>@anomaly.Date.ToString("dd/MM/yyyy")</td>
+                                    <td>
+                                        <div class="fw-semibold">@anomaly.Description</div>
+                                        <small class="text-muted">@anomaly.Reason</small>
+                                    </td>
+                                    <td><span class="badge bg-secondary">@anomaly.CategoryName</span></td>
+                                    <td class="text-end fw-bold text-danger">@anomaly.AmountTnd.ToString("0.000")</td>
+                                    <td class="text-end text-muted">@anomaly.CategoryAverageTnd.ToString("0.000")</td>
+                                    <td class="text-center"><span class="badge bg-warning text-dark">+@anomaly.ZScore.ToString("0.00") σ</span></td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 fw-bold">Prévisions par Catégorie (Mois Suivant)</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Catégorie</th>
+                            <th class="text-end">Actuel (TND)</th>
+                            <th class="text-end">Part</th>
+                            <th class="text-end">Prévision (TND)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var cat in Model.CategoryBreakdown)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@cat.CategoryName</td>
+                                <td class="text-end">@cat.TotalTnd.ToString("0.000")</td>
+                                <td class="text-end text-muted">@cat.PercentageOfTotal%</td>
+                                <td class="text-end fw-bold text-primary">@cat.ForecastNextMonthTnd.ToString("0.000")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const trendLabels = @Html.Raw(JsonSerializer.Serialize(Model.MonthlyTrends.Select(m => m.MonthLabel)));
+        const trendExpenses = @Html.Raw(JsonSerializer.Serialize(Model.MonthlyTrends.Select(m => m.TotalExpensesTnd)));
+        const trendIncomes = @Html.Raw(JsonSerializer.Serialize(Model.MonthlyTrends.Select(m => m.TotalIncomeTnd)));
+
+        new Chart(document.getElementById('trendChart'), {
+            type: 'line',
+            data: {
+                labels: trendLabels,
+                datasets: [
+                    {
+                        label: 'Dépenses (TND)',
+                        data: trendExpenses,
+                        borderColor: '#dc3545',
+                        backgroundColor: 'rgba(220, 53, 69, 0.12)',
+                        tension: 0.25,
+                        fill: true
+                    },
+                    {
+                        label: 'Revenus (TND)',
+                        data: trendIncomes,
+                        borderColor: '#198754',
+                        backgroundColor: 'rgba(25, 135, 84, 0.08)',
+                        tension: 0.25,
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'top' } }
+            }
+        });
+
+        const catLabels = @Html.Raw(JsonSerializer.Serialize(Model.CategoryBreakdown.Where(c => c.TotalTnd > 0).Select(c => c.CategoryName)));
+        const catTotals = @Html.Raw(JsonSerializer.Serialize(Model.CategoryBreakdown.Where(c => c.TotalTnd > 0).Select(c => c.TotalTnd)));
+
+        new Chart(document.getElementById('categoryChart'), {
+            type: 'doughnut',
+            data: {
+                labels: catLabels,
+                datasets: [{
+                    data: catTotals,
+                    backgroundColor: ['#0d6efd', '#dc3545', '#ffc107', '#198754', '#6f42c1', '#20c997', '#fd7e14', '#6c757d']
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'bottom' } }
+            }
+        });
+    </script>
+}
+
