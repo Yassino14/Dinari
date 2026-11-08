@@ -1,3 +1,4 @@
+using System.Data;
 using Dinari.Models;
 using Dinari.Services;
 using Microsoft.EntityFrameworkCore;
@@ -15,8 +16,48 @@ public static class DbInitializer
 
         await context.Database.EnsureCreatedAsync();
 
+        if (context.Database.IsSqlite())
+        {
+            await EnsureSchemaUpgradedAsync(context);
+        }
+
         if (await context.Transactions.AnyAsync())
         {
+            // Ensure initial batch record exists if transactions were already seeded before
+            if (!await context.CsvImportBatches.AnyAsync())
+            {
+                var allTx = await context.Transactions.ToListAsync();
+                decimal inc = allTx.Where(t => t.Type == TransactionType.Income).Sum(t => t.AmountTnd);
+                decimal exp = allTx.Where(t => t.Type == TransactionType.Expense).Sum(t => t.AmountTnd);
+                DateTime minDate = allTx.Min(t => t.Date);
+                DateTime maxDate = allTx.Max(t => t.Date);
+
+                var initialBatch = new CsvImportBatch
+                {
+                    FileName = "Historique_Initial_TND (Socle Protégé)",
+                    ImportedAtUtc = DateTime.UtcNow.AddDays(-1),
+                    TotalRowsRead = allTx.Count,
+                    ImportedCount = allTx.Count,
+                    SkippedDuplicatesCount = 0,
+                    TotalIncomeTnd = inc,
+                    TotalExpensesTnd = exp,
+                    PeriodCovered = $"{minDate:dd/MM/yyyy} → {maxDate:dd/MM/yyyy}",
+                    InterpretationSummary = $"Socle historique protégé ({allTx.Count} opérations sur 4 mois). Revenus : {inc:0.000} TND, Dépenses : {exp:0.000} TND, Épargne nette : {(inc - exp):0.000} TND."
+                };
+
+                context.CsvImportBatches.Add(initialBatch);
+                await context.SaveChangesAsync();
+
+                foreach (var tx in allTx.Where(t => t.ImportBatchId == null))
+                {
+                    tx.ImportBatchId = initialBatch.Id;
+                    if (string.IsNullOrWhiteSpace(tx.SourceLabel) || tx.SourceLabel == "Saisie Manuelle")
+                    {
+                        tx.SourceLabel = "Socle Initial";
+                    }
+                }
+                await context.SaveChangesAsync();
+            }
             return;
         }
 
@@ -81,6 +122,25 @@ public static class DbInitializer
             ("2026-11-08", "Café Express & Croissant", 11.500m, TransactionType.Expense)
         };
 
+        decimal totalInc = seedRows.Where(r => r.Type == TransactionType.Income).Sum(r => r.Amount);
+        decimal totalExp = seedRows.Where(r => r.Type == TransactionType.Expense).Sum(r => r.Amount);
+
+        var seedBatch = new CsvImportBatch
+        {
+            FileName = "Historique_Initial_TND (Socle Protégé)",
+            ImportedAtUtc = DateTime.UtcNow.AddDays(-1),
+            TotalRowsRead = seedRows.Length,
+            ImportedCount = seedRows.Length,
+            SkippedDuplicatesCount = 0,
+            TotalIncomeTnd = totalInc,
+            TotalExpensesTnd = totalExp,
+            PeriodCovered = "01/08/2026 → 08/11/2026",
+            InterpretationSummary = $"Socle historique protégé ({seedRows.Length} opérations sur 4 mois). Revenus : {totalInc:0.000} TND, Dépenses : {totalExp:0.000} TND, Épargne nette cumulée : {(totalInc - totalExp):0.000} TND."
+        };
+
+        context.CsvImportBatches.Add(seedBatch);
+        await context.SaveChangesAsync();
+
         var entities = new List<Transaction>();
         foreach (var item in seedRows)
         {
@@ -96,11 +156,67 @@ public static class DbInitializer
                 Type = item.Type,
                 Category = cat,
                 IsAutoCategorized = true,
-                ExternalHash = hash
+                ExternalHash = hash,
+                ImportBatchId = seedBatch.Id,
+                SourceLabel = "Socle Initial"
             });
         }
 
         await context.Transactions.AddRangeAsync(entities);
         await context.SaveChangesAsync();
+    }
+
+    private static async Task EnsureSchemaUpgradedAsync(AppDbContext context)
+    {
+        await context.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS ""CsvImportBatches"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_CsvImportBatches"" PRIMARY KEY AUTOINCREMENT,
+                ""FileName"" TEXT NOT NULL,
+                ""ImportedAtUtc"" TEXT NOT NULL,
+                ""TotalRowsRead"" INTEGER NOT NULL,
+                ""ImportedCount"" INTEGER NOT NULL,
+                ""SkippedDuplicatesCount"" INTEGER NOT NULL,
+                ""TotalIncomeTnd"" TEXT NOT NULL,
+                ""TotalExpensesTnd"" TEXT NOT NULL,
+                ""PeriodCovered"" TEXT NOT NULL,
+                ""InterpretationSummary"" TEXT NOT NULL
+            );
+        ");
+
+        var existingColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var conn = context.Database.GetDbConnection();
+        bool wasClosed = conn.State == ConnectionState.Closed;
+        if (wasClosed)
+        {
+            await conn.OpenAsync();
+        }
+
+        try
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "PRAGMA table_info('Transactions');";
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                existingColumns.Add(reader.GetString(1));
+            }
+        }
+        finally
+        {
+            if (wasClosed)
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        if (!existingColumns.Contains("ImportBatchId"))
+        {
+            await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Transactions"" ADD COLUMN ""ImportBatchId"" INTEGER NULL;");
+        }
+
+        if (!existingColumns.Contains("SourceLabel"))
+        {
+            await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Transactions"" ADD COLUMN ""SourceLabel"" TEXT NOT NULL DEFAULT 'Socle Initial';");
+        }
     }
 }

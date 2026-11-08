@@ -1,0 +1,333 @@
+@model Dinari.Models.BilanEpargneViewModel
+@{
+    ViewData["Title"] = "Bilan Financier & Conseils d'Épargne";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div>
+        <h2 class="fw-extrabold mb-1">
+            <i class="bi bi-piggy-bank-fill text-success me-2"></i>Bilan Patrimonial &amp; Conseils Stratégiques d'Épargne (TND)
+        </h2>
+        <p class="text-muted mb-0">
+            Synthèse globale sur <strong>@Model.TotalMonthsAnalyzed mois</strong> (@Model.TotalTransactionsCount opérations protégées), analyse 50/30/20 et simulateur d'objectifs en Dinars Tunisiens.
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-action="Journal" class="btn btn-outline-dark">
+            <i class="bi bi-journal-bookmark me-1"></i>Voir le Livre-Journal
+        </a>
+        <a asp-action="Index" class="btn btn-primary">
+            <i class="bi bi-speedometer2 me-1"></i>Retour au Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Carte Héro : Score de Santé Financière & Bilan Global Cumulé -->
+<div class="card card-hero-dark p-4 mb-4 shadow">
+    <div class="row align-items-center g-4">
+        <div class="col-lg-5 border-end border-light border-opacity-10">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-warning text-dark d-flex flex-column align-items-center justify-content-center fw-extrabold shadow"
+                     style="width: 92px; height: 92px; flex-shrink: 0;">
+                    <span class="fs-3 lh-1">@Model.FinancialHealthScore</span>
+                    <small class="small fw-bold">/ 100</small>
+                </div>
+                <div>
+                    <span class="badge bg-warning text-dark mb-1">Indice Dinari</span>
+                    <h4 class="fw-bold text-white mb-1">@Model.FinancialHealthLabel</h4>
+                    <p class="small text-white-50 mb-0">@Model.FinancialHealthSummary</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="row g-3 text-center">
+                <div class="col-sm-4">
+                    <div class="p-3 rounded-3 bg-white bg-opacity-10">
+                        <div class="small text-white-50 text-uppercase">Revenus Cumulés</div>
+                        <div class="fs-5 fw-bold text-success font-mono-tnd mt-1">+@Model.CumulativeIncomeTnd.ToString("0.000") TND</div>
+                        <small class="text-white-50">Moy. @Model.AverageMonthlyIncomeTnd.ToString("0.000") /mois</small>
+                    </div>
+                </div>
+                <div class="col-sm-4">
+                    <div class="p-3 rounded-3 bg-white bg-opacity-10">
+                        <div class="small text-white-50 text-uppercase">Dépenses Cumulées</div>
+                        <div class="fs-5 fw-bold text-danger font-mono-tnd mt-1">-@Model.CumulativeExpensesTnd.ToString("0.000") TND</div>
+                        <small class="text-white-50">Moy. @Model.AverageMonthlyExpensesTnd.ToString("0.000") /mois</small>
+                    </div>
+                </div>
+                <div class="col-sm-4">
+                    <div class="p-3 rounded-3 bg-warning bg-opacity-25 border border-warning border-opacity-50">
+                        <div class="small text-warning text-uppercase fw-bold">Épargne Nette Dégagée</div>
+                        <div class="fs-5 fw-bold text-white font-mono-tnd mt-1">@Model.CumulativeNetSavingsTnd.ToString("0.000") TND</div>
+                        <small class="text-warning fw-semibold">Taux global : @Model.GlobalSavingsRatePercent%</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Règle Budgétaire 50 / 30 / 20 adaptée à la Tunisie -->
+<div class="card card-dinari p-4 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <div>
+            <h5 class="fw-bold mb-0"><i class="bi bi-pie-chart-fill text-primary me-2"></i>Diagnostic Budgétaire selon la Règle 50 / 30 / 20 (Moyenne Mensuelle)</h5>
+            <small class="text-muted">Comparaison automatique de votre structure de dépenses en TND avec la répartition financière optimale.</small>
+        </div>
+        <div class="d-flex gap-2">
+            <span class="badge badge-soft-success">Meilleur mois d'épargne : @Model.BestSavingsMonthLabel (+@Model.BestSavingsMonthAmountTnd.ToString("0.000") TND)</span>
+            <span class="badge badge-soft-danger">Mois le plus coûteux : @Model.HighestExpenseMonthLabel (-@Model.HighestExpenseMonthAmountTnd.ToString("0.000") TND)</span>
+        </div>
+    </div>
+
+    <div class="row g-4 mt-1">
+        @foreach (var bucket in Model.Rule503020)
+        {
+            <div class="col-lg-4">
+                <div class="border rounded-4 p-3 h-100 bg-light bg-opacity-50">
+                    <div class="d-flex justify-content-between align-items-start mb-1">
+                        <h6 class="fw-bold mb-0">@bucket.Name</h6>
+                        <span class="badge bg-@bucket.StatusBadge">@bucket.ActualPercent% (Cible @bucket.TargetPercent%)</span>
+                    </div>
+                    <p class="small text-muted mb-3">@bucket.Subtitle</p>
+
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span>Réel : <strong class="font-mono-tnd">@bucket.ActualAmountTnd.ToString("0.000") TND/mois</strong></span>
+                        <span class="text-muted">Cible : <span class="font-mono-tnd">@bucket.TargetAmountTnd.ToString("0.000") TND</span></span>
+                    </div>
+
+                    <div class="progress mb-3" style="height: 10px;">
+                        <div class="progress-bar bg-@bucket.StatusBadge"
+                             role="progressbar"
+                             style="width: @(Math.Min(100, Math.Max(5, bucket.ActualPercent)))%"></div>
+                    </div>
+
+                    <div class="small text-dark bg-white p-2 rounded-3 border">
+                        <i class="bi bi-info-circle-fill text-@bucket.StatusBadge me-1"></i>@bucket.Advice
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Fonds d'Urgence & Conseils d'Épargne Personnalisés -->
+<div class="row g-4 mb-4">
+    <!-- Fonds de Sécurité -->
+    <div class="col-lg-5">
+        <div class="card card-dinari p-4 h-100">
+            <h5 class="fw-bold mb-2">
+                <i class="bi bi-shield-fill-check text-success me-2"></i>Matelas de Sécurité &amp; Fonds d'Urgence (TND)
+            </h5>
+            <p class="small text-muted">
+                En Tunisie, il est recommandé de conserver entre <strong>3 et 6 mois de charges essentielles</strong> (loyer, STEG, SONEDE, alimentation, santé) sur un compte épargne liquide.
+            </p>
+
+            <div class="p-3 rounded-4 bg-light border mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="small fw-bold text-uppercase text-muted">Vos Charges Essentielles / Mois</span>
+                    <span class="fw-bold font-mono-tnd text-dark">@Model.EssentialMonthlyAvgTnd.ToString("0.000") TND</span>
+                </div>
+                <hr class="my-2" />
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="small fw-semibold"><i class="bi bi-1-circle-fill text-primary me-1"></i>Palier Sécurité (3 Mois)</span>
+                    <span class="fw-bold text-primary font-mono-tnd">@Model.EmergencyFund3MonthsTnd.ToString("0.000") TND</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="small fw-semibold"><i class="bi bi-2-circle-fill text-success me-1"></i>Palier Sérénité (6 Mois)</span>
+                    <span class="fw-bold text-success font-mono-tnd">@Model.EmergencyFund6MonthsTnd.ToString("0.000") TND</span>
+                </div>
+            </div>
+
+            <div class="mb-2 d-flex justify-content-between small fw-bold">
+                <span>Progression actuelle (Épargne cumulée vs Palier 3 Mois)</span>
+                <span class="text-success">@Model.EmergencyFundProgressPercent%</span>
+            </div>
+            <div class="progress mb-3" style="height: 14px;">
+                <div class="progress-bar bg-success progress-bar-striped"
+                     role="progressbar"
+                     style="width: @Model.EmergencyFundProgressPercent%">
+                </div>
+            </div>
+
+            <div class="alert alert-success border-0 small mb-0 mt-auto">
+                <i class="bi bi-stars me-1"></i>
+                <strong>Potentiel d'optimisation Dinari :</strong> En appliquant les conseils ci-contre, votre capacité d'épargne mensuelle passe de
+                <strong class="font-mono-tnd">@Model.AverageMonthlySavingsTnd.ToString("0.000") TND</strong> à
+                <strong class="font-mono-tnd">@Model.OptimizedMonthlySavingsTnd.ToString("0.000") TND/mois</strong>
+                (soit <strong>+@((Model.PotentialExtraMonthlySavingsTnd * 12m).ToString("0.000")) TND/an</strong> !).
+            </div>
+        </div>
+    </div>
+
+    <!-- Plan d'Action & Conseils d'Épargne Chiffrés -->
+    <div class="col-lg-7">
+        <div class="card card-dinari p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0">
+                    <i class="bi bi-lightning-charge-fill text-warning me-2"></i>Conseils d'Épargne Personnalisés &amp; Gains Chiffrés
+                </h5>
+                <span class="badge bg-success font-mono-tnd">
+                    +@Model.PotentialExtraMonthlySavingsTnd.ToString("0.000") TND / mois disponibles
+                </span>
+            </div>
+
+            <div class="d-flex flex-column gap-3">
+                @foreach (var tip in Model.SavingsAdvices)
+                {
+                    <div class="p-3 rounded-4 border bg-white shadow-sm">
+                        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="kpi-icon-box bg-warning bg-opacity-15 text-dark" style="width: 38px; height: 38px; font-size: 1.1rem;">
+                                    <i class="bi @tip.Icon"></i>
+                                </span>
+                                <div>
+                                    <span class="badge badge-soft-indigo mb-1">@tip.CategoryTag · Priorité @tip.Priority</span>
+                                    <h6 class="fw-bold mb-0">@tip.Title</h6>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-success font-mono-tnd fs-6">+@tip.PotentialMonthlySavingsTnd.ToString("0.000") TND/mois</span>
+                                <div class="small text-muted font-mono-tnd">Soit +@tip.PotentialAnnualSavingsTnd.ToString("0.000") TND/an</div>
+                            </div>
+                        </div>
+                        <p class="small text-muted mb-0 mt-2">@tip.Detail</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Projections d'Objectifs & Simulateur Interactif d'Épargne en TND -->
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card card-dinari h-100">
+            <div class="card-header bg-white border-0 py-3 px-4">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-bullseye text-danger me-2"></i>Feuille de Route de vos Objectifs en TND</h5>
+                <small class="text-muted">Comparaison du temps requis selon votre rythme actuel vs le rythme optimisé Dinari.</small>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-dinari table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">Objectif / Projet</th>
+                            <th class="text-end">Montant Cible</th>
+                            <th class="text-center">Rythme Actuel</th>
+                            <th class="text-center">Rythme Optimisé</th>
+                            <th class="text-center pe-4">Temps Gagné</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var goal in Model.GoalProjections)
+                        {
+                            <tr>
+                                <td class="ps-4 fw-bold">
+                                    <i class="bi @goal.Icon text-primary me-2"></i>@goal.GoalTitle
+                                </td>
+                                <td class="text-end font-mono-tnd fw-bold">@goal.TargetAmountTnd.ToString("0.000") TND</td>
+                                <td class="text-center"><span class="badge bg-secondary">@goal.MonthsWithCurrentSavings mois</span></td>
+                                <td class="text-center"><span class="badge bg-success">@goal.MonthsWithOptimizedSavings mois</span></td>
+                                <td class="text-center pe-4">
+                                    @if (goal.MonthsSaved > 0)
+                                    {
+                                        <span class="badge bg-warning text-dark fw-bold">-@goal.MonthsSaved mois gagnés !</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small">Rythme optimal</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Simulateur Interactif d'Objectif d'Épargne en TND -->
+    <div class="col-lg-5">
+        <div class="card card-hero-dark p-4 h-100">
+            <h5 class="fw-bold text-warning mb-1">
+                <i class="bi bi-sliders me-2"></i>Simulateur Interactif de Projet (TND)
+            </h5>
+            <p class="small text-white-50 mb-3">
+                Simulez n'importe quel objectif d'achat ou d'investissement en Dinars Tunisiens.
+            </p>
+
+            <div class="mb-3">
+                <label class="form-label small text-white-50 fw-semibold">Nom de votre projet</label>
+                <input type="text" id="simGoalName" class="form-control form-control-sm bg-dark text-white border-secondary" value="Achat Voiture / Projet Personnel" />
+            </div>
+
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <label class="form-label small text-white-50 fw-semibold">Montant Cible (TND)</label>
+                    <input type="number" id="simTargetTnd" class="form-control form-control-sm bg-dark text-white border-secondary font-mono-tnd" value="6000.000" step="100" min="100" />
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-white-50 fw-semibold">Capital Initial (TND)</label>
+                    <input type="number" id="simInitialTnd" class="form-control form-control-sm bg-dark text-white border-secondary font-mono-tnd" value="500.000" step="50" min="0" />
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label small text-white-50 fw-semibold">Épargne Mensuelle Prévue (TND / mois)</label>
+                <input type="number" id="simMonthlyTnd" class="form-control form-control-sm bg-dark text-white border-secondary font-mono-tnd"
+                       value="@Model.OptimizedMonthlySavingsTnd.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture)" step="25" min="10" />
+            </div>
+
+            <div class="p-3 rounded-4 bg-white bg-opacity-10 border border-warning border-opacity-50 mt-auto">
+                <div class="small text-warning fw-bold text-uppercase mb-1" id="simResultTitle">Résultat de la simulation</div>
+                <div class="fs-4 fw-extrabold text-white font-mono-tnd" id="simResultMonths">— mois</div>
+                <div class="small text-white-50 mt-1" id="simResultDetails">Modifiez les montants ci-dessus pour calculer votre échéancier.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function updateSavingsSimulation() {
+            const name = document.getElementById('simGoalName').value || 'Votre Projet';
+            const target = parseFloat(document.getElementById('simTargetTnd').value) || 0;
+            const initial = parseFloat(document.getElementById('simInitialTnd').value) || 0;
+            const monthly = parseFloat(document.getElementById('simMonthlyTnd').value) || 0;
+
+            const remaining = Math.max(0, target - initial);
+            const titleEl = document.getElementById('simResultTitle');
+            const monthsEl = document.getElementById('simResultMonths');
+            const detailsEl = document.getElementById('simResultDetails');
+
+            titleEl.textContent = name;
+
+            if (remaining <= 0) {
+                monthsEl.textContent = "Objectif déjà atteint ! (0 mois)";
+                detailsEl.textContent = "Votre capital initial couvre déjà l'intégralité du montant cible en TND.";
+                return;
+            }
+
+            if (monthly <= 0) {
+                monthsEl.textContent = "Épargne mensuelle requise";
+                detailsEl.textContent = "Saisissez une épargne mensuelle supérieure à 0.000 TND.";
+                return;
+            }
+
+            const months = Math.ceil(remaining / monthly);
+            const years = (months / 12).toFixed(1);
+            const targetDate = new Date();
+            targetDate.setMonth(targetDate.getMonth() + months);
+            const dateStr = targetDate.toLocaleDateString('fr-TN', { month: 'long', year: 'numeric' });
+
+            monthsEl.textContent = `${months} mois (${years} an(s))`;
+            detailsEl.textContent = `Reste à épargner : ${remaining.toFixed(3)} TND · Réalisation estimée : ${dateStr} à raison de ${monthly.toFixed(3)} TND/mois.`;
+        }
+
+        ['simGoalName', 'simTargetTnd', 'simInitialTnd', 'simMonthlyTnd'].forEach(id => {
+            document.getElementById(id).addEventListener('input', updateSavingsSimulation);
+        });
+        updateSavingsSimulation();
+    </script>
+}

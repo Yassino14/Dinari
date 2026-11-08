@@ -20,9 +20,22 @@ public class CsvImportService : ICsvImportService
         _categorizationService = categorizationService;
     }
 
-    public async Task<CsvImportResult> ImportFromStreamAsync(Stream csvStream, CancellationToken cancellationToken = default)
+    public async Task<List<CsvImportBatch>> GetImportHistoryAsync(CancellationToken cancellationToken = default)
     {
-        var result = new CsvImportResult();
+        return await _dbContext.CsvImportBatches
+            .AsNoTracking()
+            .OrderByDescending(b => b.ImportedAtUtc)
+            .ThenByDescending(b => b.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<CsvImportResult> ImportFromStreamAsync(
+        Stream csvStream,
+        CancellationToken cancellationToken = default,
+        string fileName = "Relevé_CSV.csv")
+    {
+        string cleanFileName = string.IsNullOrWhiteSpace(fileName) ? "Relevé_CSV.csv" : Path.GetFileName(fileName.Trim());
+        var result = new CsvImportResult { FileName = cleanFileName };
 
         using var reader = new StreamReader(csvStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
         string content = await reader.ReadToEndAsync(cancellationToken);
@@ -30,6 +43,7 @@ public class CsvImportService : ICsvImportService
         if (string.IsNullOrWhiteSpace(content))
         {
             result.Errors.Add("Le fichier CSV est vide.");
+            result.ImportHistory = await GetImportHistoryAsync(cancellationToken);
             return result;
         }
 
@@ -60,6 +74,7 @@ public class CsvImportService : ICsvImportService
         if (!await csv.ReadAsync() || !csv.ReadHeader())
         {
             result.Errors.Add("Impossible de lire l'en-tête du fichier CSV.");
+            result.ImportHistory = await GetImportHistoryAsync(cancellationToken);
             return result;
         }
 
@@ -146,7 +161,8 @@ public class CsvImportService : ICsvImportService
                     Type = txType,
                     Category = category,
                     IsAutoCategorized = isAuto,
-                    ExternalHash = hash
+                    ExternalHash = hash,
+                    SourceLabel = $"CSV: {cleanFileName}"
                 });
             }
             catch (Exception ex)
@@ -157,11 +173,66 @@ public class CsvImportService : ICsvImportService
 
         if (newTransactions.Count > 0)
         {
+            decimal batchIncome = newTransactions.Where(t => t.Type == TransactionType.Income).Sum(t => t.AmountTnd);
+            decimal batchExpense = newTransactions.Where(t => t.Type == TransactionType.Expense).Sum(t => t.AmountTnd);
+            DateTime minDate = newTransactions.Min(t => t.Date);
+            DateTime maxDate = newTransactions.Max(t => t.Date);
+
+            var topCategoryGroup = newTransactions
+                .Where(t => t.Type == TransactionType.Expense)
+                .GroupBy(t => t.Category)
+                .OrderByDescending(g => g.Sum(x => x.AmountTnd))
+                .FirstOrDefault();
+
+            string topCatInfo = topCategoryGroup != null
+                ? $"Poste majeur : {_categorizationService.GetCategoryDisplayName(topCategoryGroup.Key)} ({topCategoryGroup.Sum(x => x.AmountTnd):0.000} TND)."
+                : "Aucune dépense dans ce lot.";
+
+            var maxTx = newTransactions
+                .Where(t => t.Type == TransactionType.Expense)
+                .OrderByDescending(t => t.AmountTnd)
+                .FirstOrDefault();
+
+            string maxTxInfo = maxTx != null
+                ? $" Plus forte dépense : {maxTx.Description} ({maxTx.AmountTnd:0.000} TND)."
+                : "";
+
+            string summary = $"Import protégé de {newTransactions.Count} opération(s). Flux net du relevé : {(batchIncome - batchExpense):+0.000;-0.000;0.000} TND. {topCatInfo}{maxTxInfo}";
+
+            var batch = new CsvImportBatch
+            {
+                FileName = cleanFileName,
+                ImportedAtUtc = DateTime.UtcNow,
+                TotalRowsRead = result.TotalRowsRead,
+                ImportedCount = newTransactions.Count,
+                SkippedDuplicatesCount = result.SkippedDuplicatesCount,
+                TotalIncomeTnd = batchIncome,
+                TotalExpensesTnd = batchExpense,
+                PeriodCovered = $"{minDate:dd/MM/yyyy} → {maxDate:dd/MM/yyyy}",
+                InterpretationSummary = summary
+            };
+
+            _dbContext.CsvImportBatches.Add(batch);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            foreach (var tx in newTransactions)
+            {
+                tx.ImportBatchId = batch.Id;
+            }
+
             await _dbContext.Transactions.AddRangeAsync(newTransactions, cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
+
             result.ImportedCount = newTransactions.Count;
+            result.BatchId = batch.Id;
+            result.InterpretationSummary = summary;
+        }
+        else if (result.SkippedDuplicatesCount > 0)
+        {
+            result.InterpretationSummary = $"Protection anti-doublon SHA-256 active : les {result.SkippedDuplicatesCount} opération(s) de ce relevé sont déjà présentes et protégées dans la base.";
         }
 
+        result.ImportHistory = await GetImportHistoryAsync(cancellationToken);
         return result;
     }
 
@@ -204,4 +275,3 @@ public class CsvImportService : ICsvImportService
         return decimal.TryParse(cleaned, NumberStyles.Any, CultureInfo.InvariantCulture, out value);
     }
 }
-

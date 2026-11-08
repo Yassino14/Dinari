@@ -4,79 +4,197 @@
     ViewData["Title"] = "Tableau de Bord Financier";
 }
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h2 class="fw-bold mb-0">Analyse & Prévisions Financières (@Model.CurrentMonthLabel)</h2>
-        <p class="text-muted mb-0">@Model.ForecastMethodSummary</p>
+<!-- Bandeau de Protection des Données & Sélecteur de Période / Relevé CSV -->
+<div class="shield-banner p-3 mb-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
+    <div class="d-flex align-items-center gap-3">
+        <div class="kpi-icon-box bg-success text-white shadow-sm">
+            <i class="bi bi-shield-check"></i>
+        </div>
+        <div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="fw-bold text-dark">Coffre-Fort de Données Actif</span>
+                <span class="badge bg-success">@Model.TotalProtectedTransactionsCount opérations protégées</span>
+                <span class="badge bg-dark">@Model.ImportBatches.Count relevé(s) CSV conservé(s)</span>
+            </div>
+            <div class="small text-muted">
+                Chaque nouveau CSV s'ajoute sans jamais écraser vos anciens mois ni leurs interprétations. Changez de mois ou de relevé ci-contre à tout moment.
+            </div>
+        </div>
     </div>
-    <div class="d-flex gap-2">
-        <a asp-controller="Transactions" asp-action="Create" class="btn btn-outline-dark">+ Nouvelle opération</a>
-        <a asp-controller="Transactions" asp-action="Import" class="btn btn-primary">Importer un relevé CSV</a>
+
+    <form method="get" asp-action="Index" class="d-flex flex-wrap align-items-center gap-2">
+        <div class="input-group input-group-sm" style="width: auto;">
+            <span class="input-group-text bg-white fw-semibold"><i class="bi bi-calendar3 me-1 text-primary"></i>Mois :</span>
+            <select name="month" class="form-select fw-semibold" onchange="this.form.submit()">
+                @foreach (var m in Model.AvailableMonths)
+                {
+                    if (m == Model.CurrentMonthLabel)
+                    {
+                        <option value="@m" selected>@m (Analysé)</option>
+                    }
+                    else
+                    {
+                        <option value="@m">@m</option>
+                    }
+                }
+            </select>
+        </div>
+
+        <div class="input-group input-group-sm" style="width: auto;">
+            <span class="input-group-text bg-white fw-semibold"><i class="bi bi-file-earmark-spreadsheet me-1 text-success"></i>Source :</span>
+            <select name="batchId" class="form-select" onchange="this.form.submit()">
+                <option value="">Tous les relevés combinés</option>
+                @foreach (var b in Model.ImportBatches)
+                {
+                    if (Model.SelectedBatchId == b.Id)
+                    {
+                        <option value="@b.Id" selected>@b.FileName (@b.ImportedCount op.)</option>
+                    }
+                    else
+                    {
+                        <option value="@b.Id">@b.FileName (@b.ImportedCount op.)</option>
+                    }
+                }
+            </select>
+        </div>
+
+        @if (Model.SelectedBatchId.HasValue)
+        {
+            <a asp-action="Index" class="btn btn-sm btn-outline-secondary">Voir tout</a>
+        }
+    </form>
+</div>
+
+<!-- En-tête du Mois Analysé -->
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div>
+        <div class="d-flex align-items-center gap-2">
+            <h2 class="fw-extrabold mb-0">Analyse &amp; Prévisions (@Model.CurrentMonthLabel)</h2>
+            @if (!string.IsNullOrEmpty(Model.SelectedBatchName))
+            {
+                <span class="badge bg-warning text-dark"><i class="bi bi-funnel-fill me-1"></i>Filtre : @Model.SelectedBatchName</span>
+            }
+        </div>
+        <p class="text-muted mb-0 mt-1"><i class="bi bi-cpu me-1"></i>@Model.ForecastMethodSummary</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="Journal" asp-route-month="@Model.CurrentMonthLabel" class="btn btn-outline-dark">
+            <i class="bi bi-journal-text me-1"></i>Journal du mois
+        </a>
+        <a asp-action="Bilan" class="btn btn-outline-success fw-semibold">
+            <i class="bi bi-piggy-bank me-1"></i>Bilan &amp; Conseils Épargne
+        </a>
+        <a asp-controller="Transactions" asp-action="Import" class="btn btn-gold">
+            <i class="bi bi-cloud-arrow-up-fill me-1"></i>Importer un CSV
+        </a>
     </div>
 </div>
 
 <!-- Cartes KPI en Dinars Tunisiens (TND) -->
 <div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <div class="text-muted small text-uppercase fw-semibold">Revenus du mois</div>
-                <div class="fs-4 fw-bold text-success mt-1">@Model.CurrentMonthIncomeTnd.ToString("0.000") TND</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <div class="text-muted small text-uppercase fw-semibold">Dépenses du mois</div>
-                <div class="fs-4 fw-bold text-danger mt-1">@Model.CurrentMonthExpensesTnd.ToString("0.000") TND</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <div class="text-muted small text-uppercase fw-semibold">Solde Net & Taux d'épargne</div>
-                <div class="fs-4 fw-bold @(Model.NetBalanceTnd >= 0 ? "text-primary" : "text-danger") mt-1">
-                    @Model.NetBalanceTnd.ToString("0.000") TND
+    <div class="col-md-6 col-xl-3">
+        <div class="card card-dinari h-100 p-3">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="text-muted small text-uppercase fw-bold">Revenus (@Model.CurrentMonthLabel)</div>
+                    <div class="fs-4 fw-bold text-success font-mono-tnd mt-2">+@Model.CurrentMonthIncomeTnd.ToString("0.000") <small class="fs-6">TND</small></div>
+                    <div class="small text-muted mt-1">Crédits &amp; salaires du mois</div>
                 </div>
-                <small class="text-muted">Épargne : @Model.SavingsRatePercent%</small>
+                <div class="kpi-icon-box bg-success bg-opacity-10 text-success">
+                    <i class="bi bi-arrow-down-left-circle-fill"></i>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm h-100 bg-dark text-white">
-            <div class="card-body">
-                <div class="text-warning small text-uppercase fw-semibold">Prévision Mois Suivant</div>
-                <div class="fs-4 fw-bold mt-1">@Model.ForecastNextMonthTotalTnd.ToString("0.000") TND</div>
-                <small class="@(Model.ForecastGrowthPercent > 0 ? "text-danger" : "text-success")">
-                    @(Model.ForecastGrowthPercent >= 0 ? "+" : "")@Model.ForecastGrowthPercent% vs mois actuel
-                </small>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="card card-dinari h-100 p-3">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="text-muted small text-uppercase fw-bold">Dépenses (@Model.CurrentMonthLabel)</div>
+                    <div class="fs-4 fw-bold text-danger font-mono-tnd mt-2">-@Model.CurrentMonthExpensesTnd.ToString("0.000") <small class="fs-6">TND</small></div>
+                    <div class="small text-muted mt-1">@Model.CategoryBreakdown.Sum(c => c.TransactionCount) opérations débitées</div>
+                </div>
+                <div class="kpi-icon-box bg-danger bg-opacity-10 text-danger">
+                    <i class="bi bi-arrow-up-right-circle-fill"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="card card-dinari h-100 p-3">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="text-muted small text-uppercase fw-bold">Solde Net &amp; Épargne</div>
+                    <div class="fs-4 fw-bold @(Model.NetBalanceTnd >= 0 ? "text-primary" : "text-danger") font-mono-tnd mt-2">
+                        @(Model.NetBalanceTnd >= 0 ? "+" : "")@Model.NetBalanceTnd.ToString("0.000") <small class="fs-6">TND</small>
+                    </div>
+                    <div class="small mt-1">
+                        <span class="badge @(Model.SavingsRatePercent >= 15 ? "badge-soft-success" : "badge-soft-danger")">
+                            Taux d'épargne : @Model.SavingsRatePercent%
+                        </span>
+                    </div>
+                </div>
+                <div class="kpi-icon-box bg-primary bg-opacity-10 text-primary">
+                    <i class="bi bi-wallet2"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="card card-hero-dark h-100 p-3 shadow">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="text-warning small text-uppercase fw-bold">Prévision Mois Suivant</div>
+                    <div class="fs-4 fw-bold font-mono-tnd mt-2 text-white">@Model.ForecastNextMonthTotalTnd.ToString("0.000") <small class="fs-6 text-warning">TND</small></div>
+                    <div class="small mt-1">
+                        <span class="badge @(Model.ForecastGrowthPercent > 0 ? "bg-danger" : "bg-success")">
+                            @(Model.ForecastGrowthPercent >= 0 ? "+" : "")@Model.ForecastGrowthPercent% vs @Model.CurrentMonthLabel
+                        </span>
+                        <span class="ms-1 text-white-50">Score : @Model.FinancialHealthScore/100</span>
+                    </div>
+                </div>
+                <div class="kpi-icon-box bg-warning text-dark">
+                    <i class="bi bi-graph-up-arrow"></i>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Détection des mauvaises habitudes financières -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white py-3">
-        <h5 class="mb-0 fw-bold">Détection des Habitudes Financières & Recommandations</h5>
+<!-- Détection des Habitudes Financières & Recommandations -->
+<div class="card card-dinari mb-4">
+    <div class="card-header bg-white border-0 pt-3 pb-2 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-lightbulb-fill text-warning fs-5"></i>
+            <h5 class="mb-0 fw-bold">Diagnostic Comportemental &amp; Habitudes Financières (@Model.CurrentMonthLabel)</h5>
+        </div>
+        <a asp-action="Bilan" class="btn btn-sm btn-outline-primary">
+            Voir le plan d'épargne complet <i class="bi bi-arrow-right ms-1"></i>
+        </a>
     </div>
-    <div class="card-body">
+    <div class="card-body px-4 pb-4">
         <div class="row g-3">
             @foreach (var habit in Model.BadHabits)
             {
                 <div class="col-md-6">
-                    <div class="alert alert-@habit.Severity mb-0 h-100">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <h6 class="fw-bold mb-1">@habit.Title</h6>
+                    <div class="alert alert-@habit.Severity border-0 shadow-sm mb-0 h-100 rounded-4">
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                            <h6 class="fw-bold mb-0">
+                                <i class="bi @(habit.Severity == "danger" ? "bi-exclamation-octagon-fill" : habit.Severity == "warning" ? "bi-exclamation-triangle-fill" : "bi-check-circle-fill") me-1"></i>
+                                @habit.Title
+                            </h6>
                             @if (habit.EstimatedMonthlyImpactTnd > 0)
                             {
-                                <span class="badge bg-dark">Économie potentielle : @habit.EstimatedMonthlyImpactTnd.ToString("0.000") TND/mois</span>
+                                <span class="badge bg-dark font-mono-tnd">Gain : +@habit.EstimatedMonthlyImpactTnd.ToString("0.000") TND/mois</span>
                             }
                         </div>
                         <p class="small mb-2">@habit.Description</p>
-                        <div class="small fw-semibold">Action conseillée : @habit.Recommendation</div>
+                        <div class="small fw-semibold pt-2 border-top border-dark border-opacity-10">
+                            <i class="bi bi-check2-circle me-1"></i>Conseil : @habit.Recommendation
+                        </div>
                     </div>
                 </div>
             }
@@ -87,52 +205,54 @@
 <!-- Graphiques Chart.js -->
 <div class="row g-4 mb-4">
     <div class="col-lg-7">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white py-3">
-                <h5 class="mb-0 fw-bold">Évolution Mensuelle & Prévision (TND)</h5>
+        <div class="card card-dinari h-100">
+            <div class="card-header bg-white border-0 pt-3 px-4 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-activity text-danger me-2"></i>Évolution Multi-Mois &amp; Projection OLS (TND)</h5>
+                <span class="badge badge-soft-indigo">@Model.MonthlyTrends.Count points temporels</span>
             </div>
-            <div class="card-body">
-                <canvas id="trendChart" height="130"></canvas>
+            <div class="card-body px-4">
+                <canvas id="trendChart" height="135"></canvas>
             </div>
         </div>
     </div>
     <div class="col-lg-5">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white py-3">
-                <h5 class="mb-0 fw-bold">Répartition par Catégorie (@Model.CurrentMonthLabel)</h5>
+        <div class="card card-dinari h-100">
+            <div class="card-header bg-white border-0 pt-3 px-4">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-pie-chart-fill text-primary me-2"></i>Répartition par Catégorie (@Model.CurrentMonthLabel)</h5>
             </div>
-            <div class="card-body">
-                <canvas id="categoryChart" height="180"></canvas>
+            <div class="card-body px-4">
+                <canvas id="categoryChart" height="185"></canvas>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Dépenses inhabituelles (Z-Score) & Prévisions par catégorie -->
-<div class="row g-4">
+<div class="row g-4 mb-4">
     <div class="col-lg-7">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                <h5 class="mb-0 fw-bold text-danger">Dépenses Inhabituelles Détectées (Z-Score)</h5>
-                <span class="badge bg-danger">@Model.UnusualExpenses.Count anomalie(s)</span>
+        <div class="card card-dinari h-100">
+            <div class="card-header bg-white border-0 py-3 px-4 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-danger">
+                    <i class="bi bi-radar me-2"></i>Dépenses Inhabituelles Détectées (Z-Score &ge; 1.85&sigma;)
+                </h5>
+                <span class="badge bg-danger rounded-pill">@Model.UnusualExpenses.Count anomalie(s)</span>
             </div>
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
+                <table class="table table-dinari table-hover align-middle mb-0">
+                    <thead>
                         <tr>
-                            <th>Date</th>
-                            <th>Libellé</th>
-                            <th>Catégorie</th>
+                            <th class="ps-4">Date</th>
+                            <th>Libellé &amp; Explication Statistique</th>
+                            <th>Catégorie / Source</th>
                             <th class="text-end">Montant (TND)</th>
-                            <th class="text-end">Moyenne Cat.</th>
-                            <th class="text-center">Z-Score</th>
+                            <th class="text-center pe-4">Score Z</th>
                         </tr>
                     </thead>
                     <tbody>
                         @if (Model.UnusualExpenses.Count == 0)
                         {
                             <tr>
-                                <td colspan="6" class="text-center text-muted py-4">Aucune dépense statistiquement inhabituelle détectée.</td>
+                                <td colspan="5" class="text-center text-muted py-4">Aucune dépense statistiquement inhabituelle détectée.</td>
                             </tr>
                         }
                         else
@@ -140,15 +260,19 @@
                             @foreach (var anomaly in Model.UnusualExpenses)
                             {
                                 <tr>
-                                    <td>@anomaly.Date.ToString("dd/MM/yyyy")</td>
+                                    <td class="ps-4 text-nowrap fw-semibold">@anomaly.Date.ToString("dd/MM/yyyy")</td>
                                     <td>
-                                        <div class="fw-semibold">@anomaly.Description</div>
+                                        <div class="fw-bold text-dark">@anomaly.Description</div>
                                         <small class="text-muted">@anomaly.Reason</small>
                                     </td>
-                                    <td><span class="badge bg-secondary">@anomaly.CategoryName</span></td>
-                                    <td class="text-end fw-bold text-danger">@anomaly.AmountTnd.ToString("0.000")</td>
-                                    <td class="text-end text-muted">@anomaly.CategoryAverageTnd.ToString("0.000")</td>
-                                    <td class="text-center"><span class="badge bg-warning text-dark">+@anomaly.ZScore.ToString("0.00") σ</span></td>
+                                    <td>
+                                        <span class="badge bg-secondary d-inline-block mb-1">@anomaly.CategoryName</span>
+                                        <div class="small text-muted"><i class="bi bi-hdd-stack me-1"></i>@anomaly.SourceLabel</div>
+                                    </td>
+                                    <td class="text-end fw-bold text-danger font-mono-tnd">@anomaly.AmountTnd.ToString("0.000")</td>
+                                    <td class="text-center pe-4">
+                                        <span class="badge bg-warning text-dark font-mono-tnd">+@anomaly.ZScore.ToString("0.00") &sigma;</span>
+                                    </td>
                                 </tr>
                             }
                         }
@@ -159,34 +283,88 @@
     </div>
 
     <div class="col-lg-5">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white py-3">
-                <h5 class="mb-0 fw-bold">Prévisions par Catégorie (Mois Suivant)</h5>
+        <div class="card card-dinari h-100">
+            <div class="card-header bg-white border-0 py-3 px-4">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-calculator text-primary me-2"></i>Prévisions par Catégorie (Mois Suivant)</h5>
             </div>
             <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                    <thead class="table-light">
+                <table class="table table-dinari table-hover align-middle mb-0">
+                    <thead>
                         <tr>
-                            <th>Catégorie</th>
-                            <th class="text-end">Actuel (TND)</th>
+                            <th class="ps-4">Catégorie</th>
+                            <th class="text-end">@Model.CurrentMonthLabel</th>
                             <th class="text-end">Part</th>
-                            <th class="text-end">Prévision (TND)</th>
+                            <th class="text-end pe-4">Prévision</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var cat in Model.CategoryBreakdown)
                         {
                             <tr>
-                                <td class="fw-semibold">@cat.CategoryName</td>
-                                <td class="text-end">@cat.TotalTnd.ToString("0.000")</td>
-                                <td class="text-end text-muted">@cat.PercentageOfTotal%</td>
-                                <td class="text-end fw-bold text-primary">@cat.ForecastNextMonthTnd.ToString("0.000")</td>
+                                <td class="ps-4 fw-semibold">@cat.CategoryName</td>
+                                <td class="text-end font-mono-tnd">@cat.TotalTnd.ToString("0.000")</td>
+                                <td class="text-end text-muted small">@cat.PercentageOfTotal%</td>
+                                <td class="text-end pe-4 fw-bold text-primary font-mono-tnd">@cat.ForecastNextMonthTnd.ToString("0.000")</td>
                             </tr>
                         }
                     </tbody>
                 </table>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Coffre-Fort & Historique des Relevés CSV Importés (Protection des Données & Interprétations) -->
+<div class="card card-dinari">
+    <div class="card-header bg-white border-0 py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h5 class="mb-0 fw-bold">
+                <i class="bi bi-safe2-fill text-success me-2"></i>Historique Protégé des Relevés CSV &amp; Interprétations Sauvegardées
+            </h5>
+            <small class="text-muted">Chaque import CSV conserve sa propre fiche d'analyse et ses opérations sans jamais écraser les précédentes.</small>
+        </div>
+        <a asp-controller="Transactions" asp-action="Import" class="btn btn-sm btn-gold">
+            <i class="bi bi-plus-circle me-1"></i>Ajouter un nouveau relevé CSV
+        </a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-dinari table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th class="ps-4">Lot / Fichier CSV</th>
+                    <th>Période Couverte</th>
+                    <th class="text-center">Opérations</th>
+                    <th class="text-end">Revenus (+)</th>
+                    <th class="text-end">Dépenses (-)</th>
+                    <th>Interprétation Financière Protégée</th>
+                    <th class="text-end pe-4">Explorer</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var b in Model.ImportBatches)
+                {
+                    <tr class="@(Model.SelectedBatchId == b.Id ? "table-warning" : "")">
+                        <td class="ps-4">
+                            <div class="fw-bold"><i class="bi bi-file-earmark-lock2-fill text-success me-1"></i>@b.FileName</div>
+                            <small class="text-muted">Importé le @b.ImportedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</small>
+                        </td>
+                        <td class="text-nowrap"><span class="badge bg-light text-dark border">@b.PeriodCovered</span></td>
+                        <td class="text-center"><span class="badge badge-soft-indigo">@b.ImportedCount op.</span></td>
+                        <td class="text-end text-success fw-semibold font-mono-tnd">+@b.TotalIncomeTnd.ToString("0.000")</td>
+                        <td class="text-end text-danger fw-semibold font-mono-tnd">-@b.TotalExpensesTnd.ToString("0.000")</td>
+                        <td class="small text-muted" style="max-width: 360px;">@b.InterpretationSummary</td>
+                        <td class="text-end pe-4 text-nowrap">
+                            <a asp-action="Index" asp-route-batchId="@b.Id" class="btn btn-sm btn-outline-primary" title="Isoler ce relevé sur le Dashboard">
+                                <i class="bi bi-bar-chart-line"></i> Dashboard
+                            </a>
+                            <a asp-action="Journal" asp-route-batchId="@b.Id" class="btn btn-sm btn-outline-dark ms-1" title="Voir dans le Journal">
+                                <i class="bi bi-journal-text"></i> Journal
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
     </div>
 </div>
 
@@ -204,24 +382,31 @@
                     {
                         label: 'Dépenses (TND)',
                         data: trendExpenses,
-                        borderColor: '#dc3545',
-                        backgroundColor: 'rgba(220, 53, 69, 0.12)',
-                        tension: 0.25,
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                        borderWidth: 3,
+                        pointRadius: 4,
+                        tension: 0.3,
                         fill: true
                     },
                     {
                         label: 'Revenus (TND)',
                         data: trendIncomes,
-                        borderColor: '#198754',
-                        backgroundColor: 'rgba(25, 135, 84, 0.08)',
-                        tension: 0.25,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                        borderWidth: 3,
+                        pointRadius: 4,
+                        tension: 0.3,
                         fill: false
                     }
                 ]
             },
             options: {
                 responsive: true,
-                plugins: { legend: { position: 'top' } }
+                plugins: { legend: { position: 'top' } },
+                scales: {
+                    y: { beginAtZero: true }
+                }
             }
         });
 
@@ -234,14 +419,15 @@
                 labels: catLabels,
                 datasets: [{
                     data: catTotals,
-                    backgroundColor: ['#0d6efd', '#dc3545', '#ffc107', '#198754', '#6f42c1', '#20c997', '#fd7e14', '#6c757d']
+                    backgroundColor: ['#4f46e5', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4', '#f97316', '#64748b'],
+                    borderWidth: 2
                 }]
             },
             options: {
                 responsive: true,
+                cutout: '62%',
                 plugins: { legend: { position: 'bottom' } }
             }
         });
     </script>
 }
-

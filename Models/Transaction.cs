@@ -35,6 +35,11 @@ public class Transaction
     [StringLength(64)]
     public string ExternalHash { get; set; } = string.Empty;
 
+    public int? ImportBatchId { get; set; }
+
+    [StringLength(150)]
+    [Display(Name = "Source / Relevé")]
+    public string SourceLabel { get; set; } = "Saisie Manuelle";
+
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 }
-

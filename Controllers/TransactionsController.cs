@@ -27,7 +27,11 @@ public class TransactionsController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Index(TransactionCategory? category, string? search, CancellationToken cancellationToken)
+    public async Task<IActionResult> Index(
+        TransactionCategory? category,
+        string? search,
+        int? batchId,
+        CancellationToken cancellationToken)
     {
         var query = _dbContext.Transactions.AsNoTracking().AsQueryable();
 
@@ -36,10 +40,15 @@ public class TransactionsController : Controller
             query = query.Where(t => t.Category == category.Value);
         }
 
+        if (batchId.HasValue)
+        {
+            query = query.Where(t => t.ImportBatchId == batchId.Value);
+        }
+
         if (!string.IsNullOrWhiteSpace(search))
         {
             string pattern = $"%{search.Trim()}%";
-            query = query.Where(t => EF.Functions.Like(t.Description, pattern));
+            query = query.Where(t => EF.Functions.Like(t.Description, pattern) || EF.Functions.Like(t.SourceLabel, pattern));
         }
 
         var list = await query
@@ -49,6 +58,8 @@ public class TransactionsController : Controller
 
         ViewBag.SelectedCategory = category;
         ViewBag.Search = search;
+        ViewBag.SelectedBatchId = batchId;
+        ViewBag.Batches = await _csvImportService.GetImportHistoryAsync(cancellationToken);
         return View(list);
     }
 
@@ -68,6 +79,7 @@ public class TransactionsController : Controller
         }
 
         model.AmountTnd = Math.Round(model.AmountTnd, 3, MidpointRounding.AwayFromZero);
+        model.SourceLabel = "Saisie Manuelle";
 
         if (autoCategorize)
         {
@@ -90,7 +102,7 @@ public class TransactionsController : Controller
 
         _dbContext.Transactions.Add(model);
         await _dbContext.SaveChangesAsync(cancellationToken);
-        TempData["SuccessMessage"] = $"Transaction de {model.AmountTnd:0.000} TND enregistrée avec succès.";
+        TempData["SuccessMessage"] = $"Transaction de {model.AmountTnd:0.000} TND enregistrée et protégée avec succès.";
 
         return RedirectToAction(nameof(Index));
     }
@@ -158,9 +170,13 @@ public class TransactionsController : Controller
     }
 
     [HttpGet]
-    public IActionResult Import()
+    public async Task<IActionResult> Import(CancellationToken cancellationToken)
     {
-        return View();
+        var vm = new CsvImportResult
+        {
+            ImportHistory = await _csvImportService.GetImportHistoryAsync(cancellationToken)
+        };
+        return View(vm);
     }
 
     [HttpPost]
@@ -170,23 +186,41 @@ public class TransactionsController : Controller
         if (csvFile == null || csvFile.Length == 0)
         {
             ModelState.AddModelError(string.Empty, "Veuillez sélectionner un fichier CSV valide.");
-            return View();
+            var emptyVm = new CsvImportResult
+            {
+                ImportHistory = await _csvImportService.GetImportHistoryAsync(cancellationToken)
+            };
+            return View(emptyVm);
         }
 
         using var stream = csvFile.OpenReadStream();
-        var importResult = await _csvImportService.ImportFromStreamAsync(stream, cancellationToken);
+        var importResult = await _csvImportService.ImportFromStreamAsync(stream, cancellationToken, csvFile.FileName);
+
+        if (importResult.ImportedCount > 0)
+        {
+            TempData["SuccessMessage"] = $"{importResult.ImportedCount} nouvelle(s) opération(s) importée(s) depuis '{importResult.FileName}'. Vos anciennes données et analyses restent 100 % intactes et protégées.";
+        }
 
         return View(importResult);
     }
 
     [HttpGet]
-    public async Task<IActionResult> ExportCsv(TransactionCategory? category, string? search, CancellationToken cancellationToken)
+    public async Task<IActionResult> ExportCsv(
+        TransactionCategory? category,
+        string? search,
+        int? batchId,
+        CancellationToken cancellationToken)
     {
         var query = _dbContext.Transactions.AsNoTracking().AsQueryable();
 
         if (category.HasValue)
         {
             query = query.Where(t => t.Category == category.Value);
+        }
+
+        if (batchId.HasValue)
+        {
+            query = query.Where(t => t.ImportBatchId == batchId.Value);
         }
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -209,6 +243,7 @@ public class TransactionsController : Controller
             csv.WriteField("Montant");
             csv.WriteField("Type");
             csv.WriteField("Categorie");
+            csv.WriteField("Source");
             await csv.NextRecordAsync();
 
             foreach (var t in list)
@@ -218,12 +253,13 @@ public class TransactionsController : Controller
                 csv.WriteField(t.AmountTnd.ToString("0.000", CultureInfo.InvariantCulture));
                 csv.WriteField(t.Type.ToString());
                 csv.WriteField(_categorizationService.GetCategoryDisplayName(t.Category));
+                csv.WriteField(t.SourceLabel);
                 await csv.NextRecordAsync();
             }
         }
 
         memoryStream.Position = 0;
-        return File(memoryStream.ToArray(), "text/csv", $"transactions_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv");
+        return File(memoryStream.ToArray(), "text/csv", $"dinari_export_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv");
     }
 
     [HttpPost]

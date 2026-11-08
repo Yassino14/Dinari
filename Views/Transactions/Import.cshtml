@@ -1,58 +1,177 @@
 @model Dinari.Models.CsvImportResult
 @{
-    ViewData["Title"] = "Importation CSV";
+    ViewData["Title"] = "Coffre-Fort & Importation CSV";
 }
 
-<div class="row justify-content-center">
-    <div class="col-lg-8">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white py-3">
-                <h4 class="mb-0 fw-bold">Importer un Relevé de Transactions (CSV)</h4>
-            </div>
-            <div class="card-body">
-                <p class="text-muted">
-                    Colonnes reconnues automatiquement : <code>Date</code>, <code>Description</code> (ou <code>Libelle</code>),
-                    <code>Montant</code> (en TND, séparateur décimal point ou virgule), et optionnellement <code>Type</code> ou <code>Categorie</code>.
-                    Les séparateurs <code>;</code> et <code>,</code> sont détectés automatiquement.
-                </p>
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div>
+        <h2 class="fw-extrabold mb-1">
+            <i class="bi bi-shield-check text-success me-2"></i>Coffre-Fort &amp; Importation de Relevés CSV (TND)
+        </h2>
+        <p class="text-muted mb-0">
+            Importation additive protégée par empreinte <strong>SHA-256</strong> : vos anciennes données, vos anciens mois et leurs interprétations ne sont jamais écrasés.
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-controller="Dashboard" asp-action="Index" class="btn btn-outline-dark">
+            <i class="bi bi-speedometer2 me-1"></i>Tableau de bord
+        </a>
+        <a asp-controller="Dashboard" asp-action="Journal" class="btn btn-outline-primary">
+            <i class="bi bi-journal-bookmark me-1"></i>Livre-Journal
+        </a>
+    </div>
+</div>
 
-                <form asp-action="Import" method="post" enctype="multipart/form-data" class="mb-4">
-                    @Html.AntiForgeryToken()
-                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Fichier CSV (.csv)</label>
-                        <input type="file" name="csvFile" accept=".csv,text/csv" class="form-control" required />
+<div class="row g-4 mb-4">
+    <!-- Formulaire d'Import CSV -->
+    <div class="col-lg-6">
+        <div class="card card-dinari p-4 h-100">
+            <h5 class="fw-bold mb-2"><i class="bi bi-cloud-arrow-up-fill text-primary me-2"></i>Importer un Nouveau Relevé CSV</h5>
+            <p class="small text-muted mb-3">
+                Colonnes reconnues automatiquement : <code>Date</code>, <code>Description</code> (ou <code>Libelle</code>),
+                <code>Montant</code> (en TND, point ou virgule), et optionnellement <code>Type</code> ou <code>Categorie</code>.
+                Séparateurs <code>;</code> et <code>,</code> supportés.
+            </p>
+
+            <form asp-action="Import" method="post" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-3 small"></div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Sélectionner un fichier CSV (.csv)</label>
+                    <input type="file" name="csvFile" accept=".csv,text/csv" class="form-control" required />
+                    <div class="form-text">
+                        Fichiers prêts dans le dossier du projet : <code>releve_test_tnd.csv</code> et <code>releve_decembre_tnd.csv</code>.
                     </div>
-                    <button type="submit" class="btn btn-primary px-4">Lancer l'importation et la catégorisation</button>
-                    <a asp-controller="Dashboard" asp-action="Index" class="btn btn-outline-secondary ms-2">Retour au Dashboard</a>
-                </form>
+                </div>
 
-                @if (Model != null)
-                {
-                    <div class="alert alert-info">
-                        <h6 class="fw-bold">Résultat de l'importation :</h6>
-                        <ul class="mb-0">
-                            <li>Lignes analysées : <strong>@Model.TotalRowsRead</strong></li>
-                            <li>Nouvelles transactions importées : <strong class="text-success">@Model.ImportedCount</strong></li>
-                            <li>Doublons ignorés (SHA-256) : <strong>@Model.SkippedDuplicatesCount</strong></li>
-                        </ul>
-                    </div>
+                <button type="submit" class="btn btn-gold px-4">
+                    <i class="bi bi-shield-plus me-1"></i>Importer, Catégoriser &amp; Protéger
+                </button>
+            </form>
 
-                    @if (Model.Errors.Count > 0)
+            @if (Model != null && Model.TotalRowsRead > 0)
+            {
+                <hr class="my-4" />
+                <div class="alert @(Model.ImportedCount > 0 ? "alert-success" : "alert-info") border-0 rounded-4 mb-0">
+                    <h6 class="fw-bold mb-2">
+                        <i class="bi bi-check2-all me-1"></i>Rapport d'importation : @Model.FileName
+                    </h6>
+                    <ul class="small mb-2">
+                        <li>Lignes analysées dans le fichier : <strong>@Model.TotalRowsRead</strong></li>
+                        <li>Nouvelles opérations ajoutées et protégées : <strong class="text-success">@Model.ImportedCount</strong></li>
+                        <li>Doublons existants ignorés (Protection SHA-256) : <strong>@Model.SkippedDuplicatesCount</strong></li>
+                    </ul>
+                    @if (!string.IsNullOrEmpty(Model.InterpretationSummary))
                     {
-                        <div class="alert alert-warning">
-                            <h6 class="fw-bold">Avertissements :</h6>
-                            <ul class="mb-0 small">
-                                @foreach (var err in Model.Errors)
-                                {
-                                    <li>@err</li>
-                                }
-                            </ul>
+                        <div class="small bg-white p-2 rounded-3 border text-dark">
+                            <strong><i class="bi bi-cpu me-1 text-primary"></i>Interprétation enregistrée :</strong> @Model.InterpretationSummary
                         </div>
                     }
+                    @if (Model.BatchId.HasValue)
+                    {
+                        <div class="mt-2">
+                            <a asp-controller="Dashboard" asp-action="Index" asp-route-batchId="@Model.BatchId" class="btn btn-sm btn-dark">
+                                <i class="bi bi-bar-chart-line me-1"></i>Voir l'analyse dédiée à ce CSV
+                            </a>
+                        </div>
+                    }
+                </div>
+
+                @if (Model.Errors.Count > 0)
+                {
+                    <div class="alert alert-warning border-0 rounded-4 mt-3 mb-0">
+                        <h6 class="fw-bold small">Avertissements de lecture :</h6>
+                        <ul class="mb-0 small">
+                            @foreach (var err in Model.Errors)
+                            {
+                                <li>@err</li>
+                            }
+                        </ul>
+                    </div>
                 }
+            }
+        </div>
+    </div>
+
+    <!-- Garantie de Protection & Fonctionnement -->
+    <div class="col-lg-6">
+        <div class="card card-hero-dark p-4 h-100">
+            <h5 class="fw-bold text-warning mb-3">
+                <i class="bi bi-lock-fill me-2"></i>Pourquoi vos anciennes données ne sont jamais perdues ?
+            </h5>
+            <div class="d-flex flex-column gap-3 small text-white-50">
+                <div class="p-3 rounded-3 bg-white bg-opacity-10">
+                    <div class="fw-bold text-white mb-1"><i class="bi bi-database-fill-check text-success me-2"></i>1. Stockage Cumulatif Multi-Mois</div>
+                    Ajouter un relevé de Novembre ou Décembre ne remplace jamais Août, Septembre ou Octobre. Vous pouvez basculer d'un mois à l'autre via le sélecteur en haut du Tableau de bord.
+                </div>
+                <div class="p-3 rounded-3 bg-white bg-opacity-10">
+                    <div class="fw-bold text-white mb-1"><i class="bi bi-fingerprint text-warning me-2"></i>2. Déduplication Cryptographique SHA-256</div>
+                    Chaque opération possède une empreinte unique. Importer 2 fois le même CSV n'altère ni vos soldes ni vos moyennes statistiques.
+                </div>
+                <div class="p-3 rounded-3 bg-white bg-opacity-10">
+                    <div class="fw-bold text-white mb-1"><i class="bi bi-journal-code text-info me-2"></i>3. Interprétation Individuelle Archivée</div>
+                    Chaque fichier CSV importé génère une fiche dans le coffre-fort ci-dessous avec son propre bilan et un bouton pour isoler son analyse.
+                </div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Historique complet des relevés CSV protégés -->
+<div class="card card-dinari">
+    <div class="card-header bg-white border-0 py-3 px-4">
+        <h5 class="mb-0 fw-bold">
+            <i class="bi bi-archive-fill text-primary me-2"></i>Coffre-Fort des Relevés CSV &amp; Interprétations Sauvegardées (@(Model?.ImportHistory.Count ?? 0))
+        </h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-dinari table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th class="ps-4">Fichier / Relevé</th>
+                    <th>Date d'Import</th>
+                    <th>Période des Opérations</th>
+                    <th class="text-center">Opérations</th>
+                    <th class="text-end">Total Revenus</th>
+                    <th class="text-end">Total Dépenses</th>
+                    <th>Interprétation Sauvegardée</th>
+                    <th class="text-end pe-4">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model?.ImportHistory == null || Model.ImportHistory.Count == 0)
+                {
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">Aucun lot d'import enregistré.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var batch in Model.ImportHistory)
+                    {
+                        <tr>
+                            <td class="ps-4 fw-bold">
+                                <i class="bi bi-file-earmark-spreadsheet-fill text-success me-1"></i>@batch.FileName
+                            </td>
+                            <td class="small text-muted text-nowrap">@batch.ImportedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                            <td class="text-nowrap"><span class="badge bg-light text-dark border">@batch.PeriodCovered</span></td>
+                            <td class="text-center"><span class="badge badge-soft-indigo">@batch.ImportedCount op.</span></td>
+                            <td class="text-end text-success fw-bold font-mono-tnd">+@batch.TotalIncomeTnd.ToString("0.000") TND</td>
+                            <td class="text-end text-danger fw-bold font-mono-tnd">-@batch.TotalExpensesTnd.ToString("0.000") TND</td>
+                            <td class="small text-muted" style="max-width: 340px;">@batch.InterpretationSummary</td>
+                            <td class="text-end pe-4 text-nowrap">
+                                <a asp-controller="Dashboard" asp-action="Index" asp-route-batchId="@batch.Id" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-speedometer2"></i> Analyser
+                                </a>
+                                <a asp-controller="Dashboard" asp-action="Journal" asp-route-batchId="@batch.Id" class="btn btn-sm btn-outline-dark ms-1">
+                                    <i class="bi bi-journal-text"></i> Journal
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

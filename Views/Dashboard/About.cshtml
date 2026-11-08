@@ -1,0 +1,177 @@
+@{
+    ViewData["Title"] = "À Propos de Dinari";
+}
+
+<!-- En-tête Hero À Propos -->
+<div class="card card-hero-dark p-4 p-lg-5 mb-4 shadow">
+    <div class="row align-items-center g-4">
+        <div class="col-lg-8">
+            <span class="badge bg-warning text-dark fw-bold mb-2 px-3 py-1">
+                <i class="bi bi-stars me-1"></i>Plateforme FinTech Tunisienne (.NET 10)
+            </span>
+            <h1 class="fw-extrabold text-white mb-3">Dinari — L'Assistant Financier Intelligent en Dinars Tunisiens (TND)</h1>
+            <p class="lead text-white-50 mb-4">
+                Conçu sur mesure pour les réalités économiques tunisiennes, <strong>Dinari</strong> combine la précision comptable au millime (<code>0.000 TND</code>), la protection cryptographique non-destructive des relevés CSV, et des algorithmes statistiques prédictifs (Régression Linéaire OLS, Z-Score &amp; Analyse 50/30/20).
+            </p>
+            <div class="d-flex flex-wrap gap-2">
+                <a asp-action="Index" class="btn btn-gold px-4">
+                    <i class="bi bi-speedometer2 me-1"></i>Explorer le Dashboard
+                </a>
+                <a asp-action="Bilan" class="btn btn-outline-light px-4">
+                    <i class="bi bi-piggy-bank me-1"></i>Bilan &amp; Conseils Épargne
+                </a>
+            </div>
+        </div>
+        <div class="col-lg-4 text-center">
+            <div class="p-4 rounded-4 bg-white bg-opacity-10 border border-warning border-opacity-25">
+                <i class="bi bi-shield-lock-fill text-warning" style="font-size: 3.5rem;"></i>
+                <h5 class="fw-bold text-white mt-3 mb-1">Garantie Zéro Perte</h5>
+                <p class="small text-white-50 mb-0">
+                    Vos anciens relevés CSV, vos opérations historiques et leurs interprétations financières sont <strong>protégés en permanence</strong> dans la base SQLite.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Comment fonctionne la Protection des Données lors de l'ajout de nouveaux CSV ? -->
+<div class="card card-dinari p-4 mb-4">
+    <h4 class="fw-bold mb-3">
+        <i class="bi bi-safe2-fill text-success me-2"></i>Comment Dinari protège chacun de vos relevés CSV et leurs interprétations ?
+    </h4>
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="p-3 rounded-4 bg-light h-100 border">
+                <div class="fw-bold text-success mb-2"><i class="bi bi-1-circle-fill me-1"></i>Architecture Additive Non-Destructive</div>
+                <p class="small text-muted mb-0">
+                    Lorsque vous importez un nouveau fichier CSV, <strong>aucune donnée ancienne n'est supprimée ni écrasée</strong>. Les nouvelles lignes enrichissent votre historique multi-mois tout en conservant les mois précédents intactes.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="p-3 rounded-4 bg-light h-100 border">
+                <div class="fw-bold text-primary mb-2"><i class="bi bi-2-circle-fill me-1"></i>Empreinte Unique SHA-256 Anti-Doublon</div>
+                <p class="small text-muted mb-0">
+                    Chaque opération reçoit une signature cryptographique <code>SHA-256(Date | Libellé | Montant | Type)</code>. Si vous ré-importez un relevé déjà présent ou chevauchant un ancien relevé, les doublons sont ignorés automatiquement.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="p-3 rounded-4 bg-light h-100 border">
+                <div class="fw-bold text-dark mb-2"><i class="bi bi-3-circle-fill text-warning me-1"></i>Traçabilité &amp; Interprétation par Lot CSV</div>
+                <p class="small text-muted mb-0">
+                    Chaque fichier importé est archivé dans la table <code>CsvImportBatches</code> avec sa propre synthèse d'interprétation. Vous pouvez filtrer le <strong>Dashboard</strong> ou le <strong>Livre-Journal</strong> par mois ou par fichier CSV à tout moment.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Les 4 Moteurs d'Intelligence Financière de Dinari -->
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <div class="card card-dinari p-4 h-100">
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="kpi-icon-box bg-primary bg-opacity-10 text-primary">
+                    <i class="bi bi-tags-fill"></i>
+                </div>
+                <div>
+                    <h5 class="fw-bold mb-0">1. Moteur Lexical Tunisien (Auto-Catégorisation)</h5>
+                    <small class="text-muted">Normalisation Unicode &amp; Dictionnaire des Enseignes Locales</small>
+                </div>
+            </div>
+            <p class="small text-muted mb-0">
+                Reconnaît automatiquement plus de 70 mots-clés et enseignes tunisiennes (<em>STEG, SONEDE, Topnet, Aziza, Monoprix, Carrefour, Magasin Général, Agil, Shell, OLA Energy, Ooredoo, Orange, Tunisie Telecom, MyTek, Tunisianet, Pathé, Glovo</em>) même avec des différences d'accents ou de majuscules.
+            </p>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card card-dinari p-4 h-100">
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="kpi-icon-box bg-danger bg-opacity-10 text-danger">
+                    <i class="bi bi-radar"></i>
+                </div>
+                <div>
+                    <h5 class="fw-bold mb-0">2. Détection Statistique d'Anomalies (Z-Score)</h5>
+                    <small class="text-muted">Écart-type par catégorie &amp; seuil de significativité</small>
+                </div>
+            </div>
+            <p class="small text-muted mb-0">
+                Pour chaque catégorie, Dinari calcule la moyenne historique $\mu$ et l'écart-type $\sigma$. Toute dépense présentant un score $Z = \frac{x - \mu}{\sigma} \ge 1.85$ et dépassant la moyenne d'au moins <code>25.000 TND</code> déclenche une alerte d'anomalie justifiée.
+            </p>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card card-dinari p-4 h-100">
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="kpi-icon-box bg-warning bg-opacity-15 text-dark">
+                    <i class="bi bi-graph-up-arrow"></i>
+                </div>
+                <div>
+                    <h5 class="fw-bold mb-0">3. Prévisions Budgétaires par Régression Linéaire OLS</h5>
+                    <small class="text-muted">Moindres Carrés Ordinaires &amp; Lissage Pondéré</small>
+                </div>
+            </div>
+            <p class="small text-muted mb-0">
+                Projette les dépenses du mois suivant en combinant la droite de régression linéaire ($y = a \cdot x + b$) calculée sur l'historique mensuel avec une moyenne mobile pondérée privilégiant la dynamique récente.
+            </p>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card card-dinari p-4 h-100">
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="kpi-icon-box bg-success bg-opacity-10 text-success">
+                    <i class="bi bi-piggy-bank-fill"></i>
+                </div>
+                <div>
+                    <h5 class="fw-bold mb-0">4. Diagnostic Comportemental &amp; Règle 50/30/20</h5>
+                    <small class="text-muted">Finance comportementale &amp; Simulateur d'Épargne TND</small>
+                </div>
+            </div>
+            <p class="small text-muted mb-0">
+                Détecte l'effet « Jour de Paie » (surchauffe des 10 premiers jours), le grignotage budgétaire en cafés/livraisons, et évalue l'équilibre entre Besoins Essentiels (50%), Envies (30%) et Épargne (20%).
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Pile Technologique -->
+<div class="card card-dinari p-4">
+    <h5 class="fw-bold mb-3"><i class="bi bi-stack text-primary me-2"></i>Architecture &amp; Technologies Utilisées</h5>
+    <div class="table-responsive">
+        <table class="table table-dinari align-middle mb-0">
+            <thead>
+                <tr>
+                    <th class="ps-3">Couche</th>
+                    <th>Technologie</th>
+                    <th>Rôle dans Dinari</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="ps-3 fw-bold">Backend &amp; MVC</td>
+                    <td><span class="badge bg-primary">ASP.NET Core MVC (.NET 10)</span></td>
+                    <td class="small text-muted">Contrôleurs typés, injection de dépendances, rendu Razor et API JSON.</td>
+                </tr>
+                <tr>
+                    <td class="ps-3 fw-bold">Base de Données &amp; ORM</td>
+                    <td><span class="badge bg-dark">EF Core + SQLite (dinari.db)</span></td>
+                    <td class="small text-muted">Précision <code>DECIMAL(18,3)</code> pour les millimes TND, indexation et stockage local persistant.</td>
+                </tr>
+                <tr>
+                    <td class="ps-3 fw-bold">Ingestion &amp; Export CSV</td>
+                    <td><span class="badge bg-success">CsvHelper + SHA-256</span></td>
+                    <td class="small text-muted">Parsing multi-format (<code>;</code> et <code>,</code>), hachage cryptographique et traçabilité par lot.</td>
+                </tr>
+                <tr>
+                    <td class="ps-3 fw-bold">Interface &amp; DataViz</td>
+                    <td><span class="badge bg-warning text-dark">Bootstrap 5.3 + Chart.js 4</span></td>
+                    <td class="small text-muted">Design FinTech responsive, Livre-Journal comptable et simulateur d'épargne interactif.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>

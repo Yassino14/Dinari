@@ -10,6 +10,7 @@ public class AppDbContext : DbContext
     }
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
+    public DbSet<CsvImportBatch> CsvImportBatches => Set<CsvImportBatch>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -21,8 +22,16 @@ public class AppDbContext : DbContext
             entity.Property(t => t.AmountTnd).HasPrecision(18, 3);
             entity.HasIndex(t => t.Date);
             entity.HasIndex(t => t.Category);
+            entity.HasIndex(t => t.ImportBatchId);
             entity.HasIndex(t => t.ExternalHash).IsUnique();
+        });
+
+        modelBuilder.Entity<CsvImportBatch>(entity =>
+        {
+            entity.HasKey(b => b.Id);
+            entity.Property(b => b.TotalIncomeTnd).HasPrecision(18, 3);
+            entity.Property(b => b.TotalExpensesTnd).HasPrecision(18, 3);
+            entity.HasIndex(b => b.ImportedAtUtc);
         });
     }
 }
-

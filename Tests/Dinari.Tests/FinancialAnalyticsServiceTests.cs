@@ -23,7 +23,6 @@ public class FinancialAnalyticsServiceTests
         var catService = new CategorizationService();
         var analyticsService = new FinancialAnalyticsService(context, catService);
 
-        // 4 normal transport expenses around 20 TND + 1 huge anomaly of 300 TND
         context.Transactions.AddRange(
             new Transaction { Date = new DateTime(2026, 11, 1), Description = "Taxi 1", AmountTnd = 20.000m, Type = TransactionType.Expense, Category = TransactionCategory.Transport, ExternalHash = "h1" },
             new Transaction { Date = new DateTime(2026, 11, 2), Description = "Taxi 2", AmountTnd = 22.000m, Type = TransactionType.Expense, Category = TransactionCategory.Transport, ExternalHash = "h2" },
@@ -57,7 +56,32 @@ public class FinancialAnalyticsServiceTests
         var dashboard = await analyticsService.BuildDashboardAsync();
 
         Assert.True(dashboard.ForecastNextMonthTotalTnd > 500.000m);
-        Assert.Equal(4, dashboard.MonthlyTrends.Count); // 3 historical + 1 forecast point
+        Assert.Equal(4, dashboard.MonthlyTrends.Count);
         Assert.True(dashboard.MonthlyTrends.Last().IsForecast);
+    }
+
+    [Fact]
+    public async Task BuildJournalAndBilanAsync_CalculatesRunningBalanceAndRule503020()
+    {
+        using var context = CreateInMemoryDbContext();
+        var catService = new CategorizationService();
+        var analyticsService = new FinancialAnalyticsService(context, catService);
+
+        context.Transactions.AddRange(
+            new Transaction { Date = new DateTime(2026, 11, 1), Description = "Salaire", AmountTnd = 2000.000m, Type = TransactionType.Income, Category = TransactionCategory.Income, ExternalHash = "j1" },
+            new Transaction { Date = new DateTime(2026, 11, 2), Description = "Loyer", AmountTnd = 600.000m, Type = TransactionType.Expense, Category = TransactionCategory.UtilitiesAndRent, ExternalHash = "j2" },
+            new Transaction { Date = new DateTime(2026, 11, 3), Description = "Café", AmountTnd = 15.500m, Type = TransactionType.Expense, Category = TransactionCategory.DiningOut, ExternalHash = "j3" }
+        );
+        await context.SaveChangesAsync();
+
+        var journal = await analyticsService.BuildJournalAsync();
+        Assert.Equal(3, journal.TotalEntriesCount);
+        Assert.Equal(2000.000m, journal.TotalCreditIncomeTnd);
+        Assert.Equal(615.500m, journal.TotalDebitExpenseTnd);
+        Assert.Equal(1384.500m, journal.ClosingBalanceTnd);
+
+        var bilan = await analyticsService.BuildBilanEpargneAsync();
+        Assert.Equal(3, bilan.Rule503020.Count);
+        Assert.Equal(1384.500m, bilan.CumulativeNetSavingsTnd);
     }
 }
