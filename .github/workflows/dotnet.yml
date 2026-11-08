@@ -1,0 +1,29 @@
+name: .NET CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 10.0
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore Dinari.slnx
+
+    - name: Build solution
+      run: dotnet build Dinari.slnx --no-restore --configuration Release
+
+    - name: Run unit tests
+      run: dotnet test Dinari.slnx --no-build --configuration Release --verbosity normal
