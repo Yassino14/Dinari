@@ -31,3 +31,4 @@ public class CsvImportBatch
     [StringLength(600)]
     public string InterpretationSummary { get; set; } = string.Empty;
 }
+
